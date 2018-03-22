@@ -1,5 +1,6 @@
 import java.util.concurrent.LinkedBlockingQueue
 
+import com.typesafe.scalalogging.Logger
 import messages.CheckImeiMessage
 import repository.EirRepositoryHandler
 import repository.repositories.LdapRepository
@@ -9,7 +10,9 @@ import traffic.protocols.ZmqProtocol
 
 object Main extends App {
 
-  println("Starting EIR node")
+  val logger = Logger("Eir Main")
+
+  logger.info("Starting EIR node")
 
   val checkImeiRequestQueue = new LinkedBlockingQueue[(String, CheckImeiMessage)]
   val checkImeiResponseQueue = new LinkedBlockingQueue[(String, ResponseColor.Value)]

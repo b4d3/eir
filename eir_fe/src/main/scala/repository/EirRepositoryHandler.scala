@@ -2,6 +2,7 @@ package repository
 
 import java.util.concurrent.{Executors, LinkedBlockingQueue}
 
+import com.typesafe.scalalogging.Logger
 import messages.CheckImeiMessage
 import responseColors.ResponseColor
 
@@ -11,6 +12,8 @@ import scala.util.{Failure, Success}
 abstract class EirRepositoryHandler(val checkImeiRequestQueue: LinkedBlockingQueue[(String, CheckImeiMessage)],
                                     val checkImeiResponseQueue: LinkedBlockingQueue[(String, ResponseColor.Value)])
   extends EirRepository {
+
+  val logger = Logger(classOf[EirRepositoryHandler])
 
   private implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(
     Executors.newCachedThreadPool())
@@ -36,7 +39,7 @@ abstract class EirRepositoryHandler(val checkImeiRequestQueue: LinkedBlockingQue
       } onComplete {
 
         case Success(response) => checkImeiResponseQueue.put(response)
-        case Failure(t) => println("Problem in querying repository:\n" + t)
+        case Failure(t) => logger.error("Problem in querying repository:\n" + t)
       }
     }
   }).start()

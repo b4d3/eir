@@ -1,7 +1,10 @@
+import com.typesafe.scalalogging.Logger
 import messages.{CheckImei, Imei}
 import traffgen.protocols.ZmqProtocol
 
 object Main extends App {
+
+  val logger = Logger("TrafficGenerator Main")
 
   val imei = CheckImei(Imei("8884567890123456"))
   val unknownImei = CheckImei(Imei("1234567890123400"))
@@ -10,11 +13,11 @@ object Main extends App {
   val trafficGenerator = new TrafficGenerator with ZmqProtocol
 
   while (true) {
-    println(trafficGenerator.sendCheckImeiMessage(imei))
+    logger.debug(trafficGenerator.sendCheckImeiMessage(imei))
     Thread.sleep(100)
-    println(trafficGenerator.sendCheckImeiMessage(unknownImei))
+    logger.debug(trafficGenerator.sendCheckImeiMessage(unknownImei))
     Thread.sleep(100)
-    println(trafficGenerator.sendCheckImeiMessage(blacklistedImei))
+    logger.debug(trafficGenerator.sendCheckImeiMessage(blacklistedImei))
   }
 
 }

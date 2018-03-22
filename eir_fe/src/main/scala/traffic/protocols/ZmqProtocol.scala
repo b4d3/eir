@@ -2,10 +2,13 @@ package traffic.protocols
 
 import java.math.BigInteger
 
+import com.typesafe.scalalogging.Logger
 import org.zeromq.{ZContext, ZFrame, ZMQ, ZMsg}
 import responseColors.ResponseColor
 
 trait ZmqProtocol extends Protocol {
+
+  val logger = Logger(classOf[ZmqProtocol])
 
   val context: ZContext = new ZContext(1)
 
@@ -27,7 +30,7 @@ trait ZmqProtocol extends Protocol {
 
   new Thread(() => {
 
-    println("Started receiving messages")
+    logger.info("Started receiving messages")
 
     while (true) {
 
@@ -42,7 +45,7 @@ trait ZmqProtocol extends Protocol {
       assert(reqPayload != null)
       msg.destroy()
 
-      println(s"RECEIVED: $reqPayload FROM: $reqAddress")
+      logger.debug(s"RECEIVED: $reqPayload FROM: $reqAddress")
 
       requestQueueSocket.send(s"$reqAddress;$reqPayload")
 

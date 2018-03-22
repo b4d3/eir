@@ -1,13 +1,16 @@
 package traffgen.protocols
 
+import com.typesafe.scalalogging.Logger
 import org.zeromq.ZMQ
 
 trait ZmqProtocol extends Protocol {
 
+  val logger = Logger(classOf[ZmqProtocol])
+
   val context: ZMQ.Context = ZMQ.context(1)
   val socket: ZMQ.Socket = context.socket(ZMQ.REQ)
 
-  println("Connecting to EIR")
+  logger.info("Connecting to EIR")
   socket.connect("tcp://localhost:5555")
 
   override protected def send(message: String): String = {
@@ -17,7 +20,7 @@ trait ZmqProtocol extends Protocol {
     val request = message.getBytes()
 
     // Send the message
-    println(s"Sending request $request")
+    logger.debug(s"Sending request $request")
     socket.send(request, 0)
 
     // Get the reply.

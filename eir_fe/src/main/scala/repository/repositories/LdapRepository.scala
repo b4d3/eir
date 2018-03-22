@@ -1,5 +1,6 @@
 package repository.repositories
 
+import com.typesafe.scalalogging.Logger
 import com.unboundid.ldap.sdk.{Filter, LDAPConnection, LDAPException, SearchScope}
 import messages._
 import repository.EirRepository
@@ -7,6 +8,8 @@ import repository.EirRepository
 import scala.collection.JavaConverters._
 
 trait LdapRepository extends EirRepository {
+
+  val logger = Logger(classOf[LdapRepository])
 
   private val IMEI_KEY = "imei"
   private val IMSI_KEY = "imsi"
@@ -30,7 +33,7 @@ trait LdapRepository extends EirRepository {
       }
     } catch {
       case e: LDAPException =>
-        println(s"Error when executing LDAP search on $checkImeiMessage")
+        logger.error(s"Error when executing LDAP search on $checkImeiMessage")
         "WHITE"
     }
   }
