@@ -2,7 +2,7 @@ import java.util.concurrent.LinkedBlockingQueue
 
 import messages.CheckImeiMessage
 import repository.EirRepositoryHandler
-import repository.repositories.InMemoryRepository
+import repository.repositories.LdapRepository
 import responseColors.ResponseColor
 import traffic.handler.TrafficHandler
 import traffic.protocols.ZmqProtocol
@@ -18,7 +18,7 @@ object Main extends App {
     ZmqProtocol
 
   val repositoryHandler = new EirRepositoryHandler(checkImeiRequestQueue, checkImeiResponseQueue)
-    with InMemoryRepository
+    with LdapRepository
 
   trafficHandler.startHandlingTraffic()
 }

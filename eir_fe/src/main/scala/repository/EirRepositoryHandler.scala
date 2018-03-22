@@ -36,7 +36,7 @@ abstract class EirRepositoryHandler(val checkImeiRequestQueue: LinkedBlockingQue
       } onComplete {
 
         case Success(response) => checkImeiResponseQueue.put(response)
-        case Failure(t) => println("Problem in querying repository: " + t)
+        case Failure(t) => println("Problem in querying repository:\n" + t)
       }
     }
   }).start()
