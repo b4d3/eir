@@ -13,7 +13,7 @@ abstract class EirRepositoryHandler(val checkImeiRequestQueue: LinkedBlockingQue
                                     val checkImeiResponseQueue: LinkedBlockingQueue[(String, ResponseColor.Value)])
   extends EirRepository {
 
-  val logger = Logger(classOf[EirRepositoryHandler])
+  private val logger = Logger(classOf[EirRepositoryHandler])
 
   private implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(
     Executors.newCachedThreadPool())

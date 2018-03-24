@@ -2,30 +2,38 @@ package traffic.protocols
 
 import java.math.BigInteger
 
+import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.Logger
 import org.zeromq.{ZContext, ZFrame, ZMQ, ZMsg}
 import responseColors.ResponseColor
 
 trait ZmqProtocol extends Protocol {
 
-  val logger = Logger(classOf[ZmqProtocol])
+  private val logger = Logger(classOf[ZmqProtocol])
+  private val config = ConfigFactory.load()
 
-  val context: ZContext = new ZContext(1)
+  private val context: ZContext = new ZContext(1)
 
-  val frontendSocket: ZMQ.Socket = context.createSocket(ZMQ.ROUTER)
-  frontendSocket.bind("tcp://*:5555")
+  private val frontendSocket: ZMQ.Socket = context.createSocket(ZMQ.ROUTER)
 
-  val requestQueueSocket: ZMQ.Socket = context.createSocket(ZMQ.PUSH)
+  {
+    val protocol = config.getString("fe_endpoint.protocol")
+    val address = config.getString("fe_endpoint.address")
+    val port = config.getInt("fe_endpoint.port")
+    frontendSocket.bind(s"$protocol$address:$port")
+  }
+
+  private val requestQueueSocket: ZMQ.Socket = context.createSocket(ZMQ.PUSH)
   requestQueueSocket.bind("inproc://requestQueueSocket")
 
-  val responseQueueSocket: ZMQ.Socket = context.createSocket(ZMQ.PULL)
+  private val responseQueueSocket: ZMQ.Socket = context.createSocket(ZMQ.PULL)
   responseQueueSocket.bind("inproc://responseQueueSocket")
 
 
-  val inprocRequestQueueSocket: ZMQ.Socket = context.createSocket(ZMQ.PULL)
+  private val inprocRequestQueueSocket: ZMQ.Socket = context.createSocket(ZMQ.PULL)
   inprocRequestQueueSocket.connect("inproc://requestQueueSocket")
 
-  val inprocResponseQueueSocket: ZMQ.Socket = context.createSocket(ZMQ.PUSH)
+  private val inprocResponseQueueSocket: ZMQ.Socket = context.createSocket(ZMQ.PUSH)
   inprocResponseQueueSocket.connect("inproc://responseQueueSocket")
 
   new Thread(() => {

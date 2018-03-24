@@ -1,5 +1,6 @@
 package repository.repositories
 
+import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.Logger
 import com.unboundid.ldap.sdk.{Filter, LDAPConnection, LDAPException, SearchScope}
 import messages._
@@ -7,15 +8,20 @@ import repository.EirRepository
 
 import scala.collection.JavaConverters._
 
+
 trait LdapRepository extends EirRepository {
 
-  val logger = Logger(classOf[LdapRepository])
+  private val logger = Logger(classOf[LdapRepository])
+
+  private val config = ConfigFactory.load
 
   private val IMEI_KEY = "imei"
   private val IMSI_KEY = "imsi"
-  private val baseDn = "dc=bade, dc=com"
+  private val baseDn = config.getString("baseDn")
 
-  val connection = new LDAPConnection("localhost", 389)
+  private val connection = new LDAPConnection(config.getString("ldap.host"), config.getInt("ldap" +
+    ".port"))
+
 
   override def getResponseColor(checkImeiMessage: CheckImeiMessage): String = {
 

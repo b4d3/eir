@@ -5,7 +5,8 @@ lazy val commonSettings = Seq(
   version := "0.1",
   scalaVersion := "2.12.4",
   libraryDependencies += "org.zeromq" % "jeromq" % "0.4.3",
-  libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.8.0"
+  libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.8.0",
+  libraryDependencies += "com.typesafe" % "config" % "1.3.2"
 )
 
 lazy val root = (project in file(".")).settings(commonSettings).aggregate(shared, eir_fe, traffgen)
