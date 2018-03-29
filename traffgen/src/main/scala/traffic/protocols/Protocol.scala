@@ -1,4 +1,4 @@
-package traffgen.protocols
+package traffic.protocols
 
 trait Protocol {
 

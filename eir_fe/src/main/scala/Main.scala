@@ -1,6 +1,7 @@
 import java.util.concurrent.LinkedBlockingQueue
 
 import com.typesafe.scalalogging.Logger
+import faultManagement.{FaultManager, LoggingFaultManager}
 import messages.CheckImeiMessage
 import repository.EirRepositoryHandler
 import repository.repositories.LdapRepository
@@ -21,7 +22,9 @@ object Main extends App {
     ZmqProtocol
 
   val repositoryHandler = new EirRepositoryHandler(checkImeiRequestQueue, checkImeiResponseQueue)
-    with LdapRepository
+    with LdapRepository {
+    override lazy val faultManager: FaultManager = new LoggingFaultManager
+  }
 
   trafficHandler.startHandlingTraffic()
 }

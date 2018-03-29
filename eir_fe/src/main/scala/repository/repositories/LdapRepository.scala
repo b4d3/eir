@@ -5,22 +5,24 @@ import com.typesafe.scalalogging.Logger
 import com.unboundid.ldap.sdk.{Filter, LDAPConnection, LDAPException, SearchScope}
 import messages._
 import repository.EirRepository
+import repository.alarms.RepositoryAlarms.RepositoryUnreachable
 
 import scala.collection.JavaConverters._
-
+import scala.util.Try
 
 trait LdapRepository extends EirRepository {
 
   private val logger = Logger(classOf[LdapRepository])
-
   private val config = ConfigFactory.load
 
   private val IMEI_KEY = "imei"
   private val IMSI_KEY = "imsi"
   private val baseDn = config.getString("baseDn")
 
-  private val connection = new LDAPConnection(config.getString("ldap.host"), config.getInt("ldap" +
-    ".port"))
+  private val retryPeriod = 60000
+
+  private val connection = acquireConnection(config.getString("ldap.host"),
+    config.getInt("ldap.port"))
 
 
   override def getResponseColor(checkImeiMessage: CheckImeiMessage): String = {
@@ -40,9 +42,11 @@ trait LdapRepository extends EirRepository {
     } catch {
       case e: LDAPException =>
         logger.error(s"Error when executing LDAP search on $checkImeiMessage")
+        faultManager.raiseAlarm(RepositoryUnreachable)
         "WHITE"
     }
   }
+
 
   private def createImeiSearchFilter(checkImeiMessage: CheckImeiMessage): Filter = {
 
@@ -53,5 +57,23 @@ trait LdapRepository extends EirRepository {
 
       case CheckImei(Imei(imei)) => Filter.createEqualityFilter(IMEI_KEY, imei)
     }
+  }
+
+
+  private def acquireConnection(host: String, port: Int): LDAPConnection = {
+
+    hostAvailabilityCheck(host, port).recoverWith {
+      case t: LDAPException =>
+        logger.error(s"Error when connecting to LDAP repository")
+        faultManager.raiseAlarm(RepositoryUnreachable)
+
+        logger.info(s"Retry to connect in a $retryPeriod")
+        Thread.sleep(retryPeriod)
+        hostAvailabilityCheck(host, port)
+    }.get
+  }
+
+  def hostAvailabilityCheck(host: String, port: Int): Try[LDAPConnection] = {
+    Try(new LDAPConnection(host, port))
   }
 }

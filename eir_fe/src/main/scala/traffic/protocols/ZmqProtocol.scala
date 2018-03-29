@@ -29,7 +29,6 @@ trait ZmqProtocol extends Protocol {
   private val responseQueueSocket: ZMQ.Socket = context.createSocket(ZMQ.PULL)
   responseQueueSocket.bind("inproc://responseQueueSocket")
 
-
   private val inprocRequestQueueSocket: ZMQ.Socket = context.createSocket(ZMQ.PULL)
   inprocRequestQueueSocket.connect("inproc://requestQueueSocket")
 

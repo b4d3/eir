@@ -1,5 +1,5 @@
 import messages._
-import traffgen.protocols.Protocol
+import traffic.protocols.Protocol
 
 abstract class TrafficGenerator extends Protocol {
 

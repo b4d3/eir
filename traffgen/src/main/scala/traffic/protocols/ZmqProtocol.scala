@@ -1,4 +1,4 @@
-package traffgen.protocols
+package traffic.protocols
 
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.Logger
@@ -23,13 +23,9 @@ trait ZmqProtocol extends Protocol {
 
   override protected def send(message: String): String = {
 
-    //  Ensure that the last byte of message is 0 because EIR server is expecting a
-    // 0-terminated string
-    val request = message.getBytes()
-
     // Send the message
-    logger.debug(s"Sending request $request")
-    socket.send(request, 0)
+    logger.debug(s"Sending request $message")
+    socket.send(message.getBytes(), 0)
 
     // Get the reply.
     val reply = socket.recv(0)

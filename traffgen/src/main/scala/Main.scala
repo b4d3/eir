@@ -1,6 +1,6 @@
 import com.typesafe.scalalogging.Logger
 import messages.{CheckImei, Imei}
-import traffgen.protocols.ZmqProtocol
+import traffic.protocols.ZmqProtocol
 
 object Main extends App {
 

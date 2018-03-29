@@ -6,6 +6,7 @@ lazy val commonSettings = Seq(
   scalaVersion := "2.12.4",
   libraryDependencies += "org.zeromq" % "jeromq" % "0.4.3",
   libraryDependencies += "com.typesafe.scala-logging" %% "scala-logging" % "3.8.0",
+  libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3",
   libraryDependencies += "com.typesafe" % "config" % "1.3.2"
 )
 
