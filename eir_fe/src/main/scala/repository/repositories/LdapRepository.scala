@@ -8,7 +8,7 @@ import repository.EirRepository
 import repository.alarms.RepositoryAlarms.RepositoryUnreachable
 
 import scala.collection.JavaConverters._
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 trait LdapRepository extends EirRepository {
 
@@ -17,9 +17,9 @@ trait LdapRepository extends EirRepository {
 
   private val IMEI_KEY = "imei"
   private val IMSI_KEY = "imsi"
-  private val baseDn = config.getString("baseDn")
+  private val baseDn = config.getString("ldap.baseDn")
 
-  private val retryPeriod = 60000
+  private val retryPeriod = config.getInt("ldap.retryConnectPeriod")
 
   private val connection = acquireConnection(config.getString("ldap.host"),
     config.getInt("ldap.port"))
@@ -33,8 +33,8 @@ trait LdapRepository extends EirRepository {
       val searchResult = connection.search(baseDn, SearchScope.ONE, searchFilter)
       searchResult.getSearchEntries.asScala match {
         // TODO implement proper logic.
-        // TODO Where to keep the color information? As value in LDAP database have specific
-        // TODO LDAP branch?
+        // TODO Where to keep the color information? As value in LDAP database for each IMEI or
+        // TODO have specific LDAP branch?
         case entries if entries.isEmpty => "BLACK"
         case entries if entries.head.getAttributeValue(IMSI_KEY).startsWith("098") => "BLACK"
         case _ => "WHITE"
@@ -60,18 +60,22 @@ trait LdapRepository extends EirRepository {
   }
 
 
-  private def acquireConnection(host: String, port: Int): LDAPConnection = {
+  //TODO Handle reconnection in Connection pool (good even for a single connection because it
+  //TODO handles connection management
+  private def acquireConnection(host: String, port: Int): LDAPConnection =
 
-    hostAvailabilityCheck(host, port).recoverWith {
-      case t: LDAPException =>
-        logger.error(s"Error when connecting to LDAP repository")
+    hostAvailabilityCheck(host, port) match {
+      case Success(ldapConnection) =>
+        logger.info(s"LDAP Connection to $host:$port established")
+        ldapConnection
+      case Failure(f) =>
+        logger.error(s"Error when connecting to LDAP repository: ", f)
         faultManager.raiseAlarm(RepositoryUnreachable)
 
-        logger.info(s"Retry to connect in a $retryPeriod")
+        logger.info(s"Retry to connect in a $retryPeriod ms")
         Thread.sleep(retryPeriod)
-        hostAvailabilityCheck(host, port)
-    }.get
-  }
+        acquireConnection(host, port)
+    }
 
   def hostAvailabilityCheck(host: String, port: Int): Try[LDAPConnection] = {
     Try(new LDAPConnection(host, port))
