@@ -1,25 +1,21 @@
 package traffic.protocols
 
-import com.typesafe.config.ConfigFactory
+import pureconfig.generic.auto._
 import com.typesafe.scalalogging.Logger
+import config.FeEndpoint
 import org.zeromq.ZMQ
 
 trait ZmqProtocol extends Protocol {
 
   private val logger = Logger(classOf[ZmqProtocol])
-  private val config = ConfigFactory.load()
+  private val config = pureconfig.loadConfigOrThrow[FeEndpoint]("fe_endpoint")
 
   private val context: ZMQ.Context = ZMQ.context(1)
   private val socket: ZMQ.Socket = context.socket(ZMQ.REQ)
 
   logger.info("Connecting to EIR")
 
-  {
-    val protocol = config.getString("fe_endpoint.protocol")
-    val address = config.getString("fe_endpoint.address")
-    val port = config.getString("fe_endpoint.port")
-    socket.connect(s"$protocol$address:$port")
-  }
+  socket.connect(s"${config.protocol}${config.address}:${config.port}")
 
   override protected def send(message: String): String = {
 

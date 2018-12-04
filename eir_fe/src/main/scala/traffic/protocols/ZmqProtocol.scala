@@ -2,24 +2,25 @@ package traffic.protocols
 
 import java.math.BigInteger
 
-import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.Logger
+import config.{EirFeConfig, FmConfig}
 import org.zeromq.{ZContext, ZFrame, ZMQ, ZMsg}
 import responseColors.ResponseColor
+import pureconfig.generic.auto._
 
 trait ZmqProtocol extends Protocol {
 
   private val logger = Logger(classOf[ZmqProtocol])
-  private val config = ConfigFactory.load()
+  private val config = pureconfig.loadConfigOrThrow[EirFeConfig]
 
   private val context: ZContext = new ZContext(1)
 
   private val frontendSocket: ZMQ.Socket = context.createSocket(ZMQ.ROUTER)
 
   {
-    val protocol = config.getString("fe_endpoint.protocol")
-    val address = config.getString("fe_endpoint.address")
-    val port = config.getInt("fe_endpoint.port")
+    val protocol = config.feEndpoint.protocol
+    val address = config.feEndpoint.address
+    val port = config.feEndpoint.port
     frontendSocket.bind(s"$protocol$address:$port")
   }
 

@@ -1,8 +1,9 @@
 package repository.repositories
 
-import com.typesafe.config.ConfigFactory
+import pureconfig.generic.auto._
 import com.typesafe.scalalogging.Logger
 import com.unboundid.ldap.sdk.{Filter, LDAPConnection, LDAPException, SearchScope}
+import config.EirFeConfig
 import messages._
 import repository.EirRepository
 import repository.alarms.RepositoryAlarms
@@ -13,17 +14,13 @@ import scala.util.{Failure, Success, Try}
 trait LdapRepository extends EirRepository {
 
   private val logger = Logger(classOf[LdapRepository])
-  private val config = ConfigFactory.load
+  private val config = pureconfig.loadConfigOrThrow[EirFeConfig]
 
   private val IMEI_KEY = "imei"
   private val IMSI_KEY = "imsi"
-  private val baseDn = config.getString("ldap.baseDn")
-
-  private val retryPeriod = config.getInt("ldap.retryConnectPeriod")
-
-  private val connection = acquireConnection(config.getString("ldap.host"),
-    config.getInt("ldap.port"))
-
+  private val baseDn = config.ldap.baseDn
+  private val retryPeriod = config.ldap.retryConnectPeriod
+  private val connection = acquireConnection(config.ldap.host, config.ldap.port)
 
   override def getResponseColor(checkImeiMessage: CheckImeiMessage): String = {
 

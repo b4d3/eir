@@ -2,16 +2,17 @@ package faultManagement
 
 import java.util.concurrent.{ConcurrentHashMap, LinkedBlockingQueue}
 
-import com.typesafe.config.ConfigFactory
+import pureconfig.generic.auto._
 import com.typesafe.scalalogging.Logger
+import config.FmConfig
 
 trait FaultManager {
 
   private val logger = Logger(classOf[FaultManager])
 
-  private val config = ConfigFactory.load
-  private val throttlingPeriod = config.getLong("fm.throttlingPeriod")
-  private val maxActiveAlarms = config.getInt("fm.maxActiveAlarms")
+  private val config = pureconfig.loadConfigOrThrow[FmConfig]("fm")
+  private val throttlingPeriod = config.throttlingPeriod
+  private val maxActiveAlarms = config.maxActiveAlarms
 
   private val throttledAlarms = new ConcurrentHashMap[Alarm, LinkedBlockingQueue[Long]]()
 
