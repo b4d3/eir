@@ -13,10 +13,11 @@ object Main extends App {
 
   val logger = Logger("Eir Main")
 
+
   logger.info("Starting EIR node")
 
   val checkImeiRequestQueue = new LinkedBlockingQueue[(String, CheckImeiMessage)]
-  val checkImeiResponseQueue = new LinkedBlockingQueue[(String, ResponseColor.Value)]
+  val checkImeiResponseQueue = new LinkedBlockingQueue[(String, ResponseColor)]
 
   val trafficHandler = new TrafficHandler(checkImeiRequestQueue, checkImeiResponseQueue) with
     ZmqProtocol

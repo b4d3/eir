@@ -4,13 +4,13 @@ import java.util.concurrent.{Executors, LinkedBlockingQueue}
 
 import com.typesafe.scalalogging.Logger
 import messages.CheckImeiMessage
-import responseColors.ResponseColor
+import responseColors._
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
 abstract class EirRepositoryHandler(val checkImeiRequestQueue: LinkedBlockingQueue[(String, CheckImeiMessage)],
-                                    val checkImeiResponseQueue: LinkedBlockingQueue[(String, ResponseColor.Value)])
+                                    val checkImeiResponseQueue: LinkedBlockingQueue[(String, ResponseColor)])
   extends EirRepository {
 
   private val logger = Logger(classOf[EirRepositoryHandler])
@@ -30,8 +30,8 @@ abstract class EirRepositoryHandler(val checkImeiRequestQueue: LinkedBlockingQue
         val responseColorString = getResponseColor(checkImeiMessage)
 
         val responseColor = responseColorString match {
-          case "WHITE" => ResponseColor.WHITE
-          case "BLACK" => ResponseColor.BLACK
+          case "WHITE" => White()
+          case "BLACK" => Black()
         }
 
         (sendAddress, responseColor)

@@ -101,7 +101,7 @@ trait ZmqProtocol extends Protocol {
     (address, payload)
   }
 
-  override def sendMessage(address: String, responseColor: ResponseColor.Value): Unit = {
+  override def sendMessage(address: String, responseColor: ResponseColor): Unit = {
 
     inprocResponseQueueSocket.send(s"$address;${responseColor.toString}")
   }

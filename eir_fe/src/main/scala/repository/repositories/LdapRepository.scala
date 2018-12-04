@@ -5,7 +5,7 @@ import com.typesafe.scalalogging.Logger
 import com.unboundid.ldap.sdk.{Filter, LDAPConnection, LDAPException, SearchScope}
 import messages._
 import repository.EirRepository
-import repository.alarms.RepositoryAlarms.RepositoryUnreachable
+import repository.alarms.RepositoryAlarms
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
@@ -42,7 +42,7 @@ trait LdapRepository extends EirRepository {
     } catch {
       case e: LDAPException =>
         logger.error(s"Error when executing LDAP search on $checkImeiMessage")
-        faultManager.raiseAlarm(RepositoryUnreachable)
+        faultManager.raiseAlarm(RepositoryAlarms.REPOSITORY_UNREACHABLE)
         "WHITE"
     }
   }
@@ -52,10 +52,10 @@ trait LdapRepository extends EirRepository {
 
     checkImeiMessage match {
 
-      case CheckImeiWithImsi(Imei(imei), Imsi(imsi)) => Filter.createANDFilter(Filter
-        .createEqualityFilter(IMEI_KEY, imei), Filter.createEqualityFilter(IMSI_KEY, imsi))
+      case CheckImeiWithImsi(imei, imsi) => Filter.createANDFilter(Filter
+        .createEqualityFilter(IMEI_KEY, imei.value), Filter.createEqualityFilter(IMSI_KEY, imsi.value))
 
-      case CheckImei(Imei(imei)) => Filter.createEqualityFilter(IMEI_KEY, imei)
+      case CheckImei(imei) => Filter.createEqualityFilter(IMEI_KEY, imei.value)
     }
   }
 
@@ -70,7 +70,7 @@ trait LdapRepository extends EirRepository {
         ldapConnection
       case Failure(f) =>
         logger.error(s"Error when connecting to LDAP repository: ", f)
-        faultManager.raiseAlarm(RepositoryUnreachable)
+        faultManager.raiseAlarm(RepositoryAlarms.REPOSITORY_UNREACHABLE)
 
         logger.info(s"Retry to connect in a $retryPeriod ms")
         Thread.sleep(retryPeriod)

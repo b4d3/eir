@@ -6,5 +6,5 @@ trait Protocol {
 
   def receiveMessage(): (String, String)
 
-  def sendMessage(address: String, responseColor: ResponseColor.Value)
+  def sendMessage(address: String, responseColor: ResponseColor)
 }

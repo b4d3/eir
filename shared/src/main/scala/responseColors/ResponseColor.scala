@@ -1,8 +1,6 @@
 package responseColors
 
-object ResponseColor extends Enumeration {
+sealed abstract class ResponseColor
 
-  type Color = Value
-
-  val WHITE, BLACK = Value
-}
+final case class White() extends ResponseColor
+final case class Black() extends ResponseColor
