@@ -4,11 +4,14 @@ import pureconfig.generic.auto._
 import com.typesafe.scalalogging.Logger
 import config.FeEndpoint
 import org.zeromq.ZMQ
+import pureconfig.generic.ProductHint
+import pureconfig.{CamelCase, ConfigFieldMapping}
 
 trait ZmqProtocol extends Protocol {
 
   private val logger = Logger(classOf[ZmqProtocol])
-  private val config = pureconfig.loadConfigOrThrow[FeEndpoint]("fe_endpoint")
+  implicit def hint[T] = ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
+  private val config = pureconfig.loadConfigOrThrow[FeEndpoint]("feEndpoint")
 
   private val context: ZMQ.Context = ZMQ.context(1)
   private val socket: ZMQ.Socket = context.socket(ZMQ.REQ)

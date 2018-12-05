@@ -5,12 +5,15 @@ import java.math.BigInteger
 import com.typesafe.scalalogging.Logger
 import config.{EirFeConfig, FmConfig}
 import org.zeromq.{ZContext, ZFrame, ZMQ, ZMsg}
+import pureconfig.generic.ProductHint
+import pureconfig.{CamelCase, ConfigFieldMapping}
 import responseColors.ResponseColor
 import pureconfig.generic.auto._
 
 trait ZmqProtocol extends Protocol {
 
   private val logger = Logger(classOf[ZmqProtocol])
+  implicit def hint[T] = ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
   private val config = pureconfig.loadConfigOrThrow[EirFeConfig]
 
   private val context: ZContext = new ZContext(1)

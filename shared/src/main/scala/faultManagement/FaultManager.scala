@@ -5,11 +5,14 @@ import java.util.concurrent.{ConcurrentHashMap, LinkedBlockingQueue}
 import pureconfig.generic.auto._
 import com.typesafe.scalalogging.Logger
 import config.FmConfig
+import pureconfig.generic.ProductHint
+import pureconfig.{CamelCase, ConfigFieldMapping}
 
 trait FaultManager {
 
   private val logger = Logger(classOf[FaultManager])
 
+  implicit def hint[T] = ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
   private val config = pureconfig.loadConfigOrThrow[FmConfig]("fm")
   private val throttlingPeriod = config.throttlingPeriod
   private val maxActiveAlarms = config.maxActiveAlarms

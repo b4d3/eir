@@ -1,7 +1,5 @@
 package config
 
-import pureconfig.generic.auto._
-
 case class FeEndpoint(protocol: String,
                        address: String,
                        port: Int)
