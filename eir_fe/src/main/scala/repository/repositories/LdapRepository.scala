@@ -61,7 +61,7 @@ trait LdapRepository extends EirRepository {
 
 
   //TODO Handle reconnection in Connection pool (good even for a single connection because it
-  //TODO handles connection management
+  // handles connection management)
   private def acquireConnection(host: String, port: Int): LDAPConnection =
 
     hostAvailabilityCheck(host, port) match {

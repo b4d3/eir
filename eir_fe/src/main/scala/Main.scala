@@ -1,7 +1,7 @@
 import java.util.concurrent.LinkedBlockingQueue
 
 import com.typesafe.scalalogging.Logger
-import faultManagement.{FaultManager, LoggingFaultManager}
+import faultManagement.{FaultManager, LoggingNotifier}
 import messages.CheckImeiMessage
 import repository.EirRepositoryHandler
 import repository.repositories.LdapRepository
@@ -24,7 +24,7 @@ object Main extends App {
 
   val repositoryHandler = new EirRepositoryHandler(checkImeiRequestQueue, checkImeiResponseQueue)
     with LdapRepository {
-    override lazy val faultManager: FaultManager = new LoggingFaultManager
+    override lazy val faultManager = new FaultManager(new LoggingNotifier)
   }
 
   trafficHandler.startHandlingTraffic()
