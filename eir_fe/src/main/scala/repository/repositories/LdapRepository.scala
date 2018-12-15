@@ -16,7 +16,7 @@ import scala.util.{Failure, Success, Try}
 trait LdapRepository extends EirRepository {
 
   private val logger = Logger(classOf[LdapRepository])
-  implicit def hint[T] = ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
+  private implicit def hint[T] = ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
   private val config = pureconfig.loadConfigOrThrow[EirFeConfig]
 
   private val IMEI_KEY = "imei"

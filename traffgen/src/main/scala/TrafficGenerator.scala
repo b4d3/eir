@@ -1,16 +1,15 @@
 import messages._
 import traffic.protocols.Protocol
 
-abstract class TrafficGenerator extends Protocol {
+final class TrafficGenerator[F[_]](protocol: Protocol[F]) {
 
-  def sendCheckImeiMessage(checkImeiMessage: CheckImeiMessage): String = {
+  def sendCheckImeiMessage(checkImeiMessage: CheckImeiMessage): F[String] = {
 
     val message = checkImeiMessage match {
       case CheckImei(imei) => imei.value
       case CheckImeiWithImsi(imei, imsi) => s"${imei.value};${imsi.value}"
     }
 
-    send(message)
+    protocol.send(message)
   }
-
 }

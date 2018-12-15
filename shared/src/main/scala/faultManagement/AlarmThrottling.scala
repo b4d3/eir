@@ -20,10 +20,10 @@ trait AlarmThrottling[F[_]] {
 
 object AlarmThrottling {
 
-  implicit def hint[T]: ProductHint[T] = ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
+  private implicit def hint[T]: ProductHint[T] = ProductHint[T](ConfigFieldMapping(CamelCase,
+    CamelCase))
 
   private val config = pureconfig.loadConfigOrThrow[FmConfig]("fm")
-
 
   def create(): IO[Nothing, AlarmThrottling[IO[Nothing, ?]]] =
     Ref[Map[Alarm, Vector[Long]]](Map()).map { m =>

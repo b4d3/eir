@@ -13,7 +13,7 @@ import pureconfig.generic.auto._
 trait ZmqProtocol extends Protocol {
 
   private val logger = Logger(classOf[ZmqProtocol])
-  implicit def hint[T] = ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
+  private implicit def hint[T] = ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
   private val config = pureconfig.loadConfigOrThrow[EirFeConfig]
 
   private val context: ZContext = new ZContext(1)

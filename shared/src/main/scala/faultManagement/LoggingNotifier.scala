@@ -2,34 +2,33 @@ package faultManagement
 
 import com.typesafe.scalalogging.Logger
 import scalaz.Applicative
-import scalaz.Scalaz._
+import utils.logging.Logging
 
-class LoggingNotifier[F[_] : Applicative] extends Notifier[F] {
+final class LoggingNotifier[F[_] : Applicative : Logging] extends Notifier[F] {
 
-  private val logger = Logger(classOf[LoggingNotifier[F]])
+  private implicit val logger: Logger = Logger(classOf[LoggingNotifier[F]])
 
   /**
     * Override this for specific alarm raising notification (e.g. over SNMP)
     *
     * @param alarm Alarm to be raised
     */
-  override def notifyAlarmRaise(alarm: Alarm): F[Unit] = (alarm.alarmSeverity match {
+  override def notifyAlarmRaise(alarm: Alarm): F[Unit] = alarm.alarmSeverity match {
 
-    case DEBUG => logger.debug(s"$alarm")
-    case INFO | NOTICE => logger.info(s"$alarm")
-    case WARNING => logger.warn(s"$alarm")
-    case ERROR | CRITICAL | ALERT | EMERGENCY => logger.error(s"$alarm")
-  }).pure[F]
+    case DEBUG => Logging[F].debug(s"$alarm")
+    case INFO | NOTICE => Logging[F].info(s"$alarm")
+    case WARNING => Logging[F].warn(s"$alarm")
+    case ERROR | CRITICAL | ALERT | EMERGENCY => Logging[F].error(s"$alarm")
+  }
 
   /**
     * Override this for specific alarm clearing notification (e.g. over SNMP)
     *
     * @param alarm Alarm to be cleared
     */
-  override def notifyAlarmClear(alarm: Alarm): F[Unit] = (alarm.alarmSeverity match {
+  override def notifyAlarmClear(alarm: Alarm): F[Unit] = alarm.alarmSeverity match {
 
-    case DEBUG => logger.debug(s"CLEARED: $alarm")
-    case _ => logger.info(s"CLEARED: $alarm")
-
-  }).pure[F]
+    case DEBUG => Logging[F].debug(s"CLEARED: $alarm")
+    case _ => Logging[F].info(s"CLEARED: $alarm")
+  }
 }

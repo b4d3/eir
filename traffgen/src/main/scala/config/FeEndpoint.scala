@@ -1,7 +1,7 @@
 package config
 
 case class FeEndpoint(
-                   protocol: String,
-                   address: String,
-                   port: Int
-                 )
+                       protocol: String,
+                       address: String,
+                       port: Int
+                     )

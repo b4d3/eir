@@ -1,6 +1,6 @@
 package traffic.protocols
 
-trait Protocol {
+trait Protocol[F[_]] {
 
-  protected def send(message: String): String
+  def send(message: String): F[String]
 }

@@ -1,34 +1,43 @@
 package traffic.protocols
 
-import pureconfig.generic.auto._
 import com.typesafe.scalalogging.Logger
+import pureconfig.generic.auto._
 import config.FeEndpoint
 import org.zeromq.ZMQ
 import pureconfig.generic.ProductHint
 import pureconfig.{CamelCase, ConfigFieldMapping}
+import scalaz.Monad
+import scalaz.Scalaz._
+import utils.logging.Logging
 
-trait ZmqProtocol extends Protocol {
+object ZmqProtocol {
 
-  private val logger = Logger(classOf[ZmqProtocol])
-  implicit def hint[T] = ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
-  private val config = pureconfig.loadConfigOrThrow[FeEndpoint]("feEndpoint")
+  def apply[F[_] : Monad : Logging](): F[ZmqProtocol[F]] = {
 
-  private val context: ZMQ.Context = ZMQ.context(1)
-  private val socket: ZMQ.Socket = context.socket(ZMQ.REQ)
+    implicit val className: Logger = Logger(classOf[ZmqProtocol[F]])
 
-  logger.info("Connecting to EIR")
+    implicit def hint[T] = ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
 
-  socket.connect(s"${config.protocol}${config.address}:${config.port}")
+    val config = pureconfig.loadConfigOrThrow[FeEndpoint]("feEndpoint")
 
-  override protected def send(message: String): String = {
+    for {
+      socket <- Monad[F].pure(ZMQ.context(1)).map(_.socket(ZMQ.REQ))
+      _ <- Logging[F].info("Connecting to EIR")
+      connected <- Monad[F].pure(socket.connect(s"${config.protocol}${config.address}:${config.port}"))
+      _ <- if (connected) Logging[F].info("Connected!") else Logging[F].info("Not connected!")
+    } yield new ZmqProtocol[F](socket)
 
-    // Send the message
-    logger.debug(s"Sending request $message")
-    socket.send(message.getBytes(), 0)
-
-    // Get the reply.
-    val reply = socket.recv(0)
-
-    new String(s"$message=${new String(reply)}")
   }
+}
+
+class ZmqProtocol[F[_] : Monad : Logging] private(socket: ZMQ.Socket) extends Protocol[F] {
+
+  private implicit val className: Logger = Logger(classOf[ZmqProtocol[F]])
+
+  override def send(message: String): F[String] =
+    for {
+      _ <- Logging[F].debug(s"Sending request $message")
+      _ <- Monad[F].pure(socket.send(message.getBytes(), 0))
+      reply <- Monad[F].pure(socket.recv(0))
+    } yield new String(s"$message=${new String(reply)}")
 }

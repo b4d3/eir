@@ -1,12 +1,13 @@
 package faultManagement
 
+import com.typesafe.scalalogging.Logger
 import scalaz.Monad
 import scalaz.Scalaz._
-import utils.Logging
+import utils.logging.Logging
 
 final class FaultManager[F[_] : Monad : Logging : AlarmThrottling](notifier: Notifier[F]) {
 
-  implicit val className: Class[FaultManager[F]] = classOf[FaultManager[F]]
+  implicit val logger: Logger = Logger(classOf[FaultManager[F]])
 
   def raiseAlarm(alarm: Alarm): F[Unit] =
     for {
