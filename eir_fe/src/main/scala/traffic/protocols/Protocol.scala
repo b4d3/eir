@@ -2,9 +2,9 @@ package traffic.protocols
 
 import responseColors.ResponseColor
 
-trait Protocol {
+trait Protocol[F[_]] {
 
-  def receiveMessage(): (String, String)
+  def receiveMessage(): F[(String, String)]
 
-  def sendMessage(address: String, responseColor: ResponseColor)
+  def sendMessage(address: String, responseColor: ResponseColor): F[Unit]
 }

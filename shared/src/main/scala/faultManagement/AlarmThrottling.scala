@@ -1,11 +1,15 @@
 package faultManagement
 
+import cats.effect._
+import cats.effect.concurrent.Ref
 import config.FmConfig
 import pureconfig.{CamelCase, ConfigFieldMapping}
 import pureconfig.generic.ProductHint
 import pureconfig.generic.auto._
-import scalaz.zio.{IO, Ref, system}
 import simulacrum.typeclass
+import cats.implicits._
+
+import scala.concurrent.duration.MILLISECONDS
 
 @typeclass
 trait AlarmThrottling[F[_]] {
@@ -25,37 +29,37 @@ object AlarmThrottling {
 
   private val config = pureconfig.loadConfigOrThrow[FmConfig]("fm")
 
-  def create(): IO[Nothing, AlarmThrottling[IO[Nothing, ?]]] =
-    Ref[Map[Alarm, Vector[Long]]](Map()).map { m =>
-      new AlarmThrottling[IO[Nothing, ?]] {
+  def create[F[_]: Sync]()(implicit clock: Clock[F]): F[AlarmThrottling[F]] =
+    Ref.of[F, Map[Alarm, Vector[Long]]](Map()).map { m =>
+      new AlarmThrottling[F] {
 
         private val throttlingPeriod = config.throttlingPeriod
         private val maxActiveAlarms = config.maxActiveAlarms
 
-        private def removeAlarmsOlderThanThrottlingPeriod(): IO[Nothing, Unit] =
+        private def removeAlarmsOlderThanThrottlingPeriod(): F[Unit] =
           for {
-            currentTime <- system.currentTimeMillis
+            currentTime <- clock.monotonic(MILLISECONDS)
             _ <- m.update {
               _.mapValues(_.filter(i => (currentTime - i) >= throttlingPeriod))
             }
           } yield ()
 
-        override def isThrottled(alarm: Alarm): IO[Nothing, Boolean] =
+        override def isThrottled(alarm: Alarm): F[Boolean] =
           for {
             _ <- removeAlarmsOlderThanThrottlingPeriod()
             map <- m.get
             throttled <- map.get(alarm) match {
-              case Some(alarmTimestamps) => IO.point(alarmTimestamps.size < maxActiveAlarms)
+              case Some(alarmTimestamps) => Sync[F].delay(alarmTimestamps.size < maxActiveAlarms)
 
-              case None => IO.point(false)
+              case None => Sync[F].pure(false)
             }
           } yield throttled
 
-        override def updateThrottlingFor(alarm: Alarm): IO[Nothing, Unit] =
+        override def updateThrottlingFor(alarm: Alarm): F[Unit] =
           for {
-            currentTime <- system.currentTimeMillis
+            currentTime <- clock.monotonic(MILLISECONDS)
             map <- m.get
-            containsAlarmTimestamps <- IO.point(map.contains(alarm))
+            containsAlarmTimestamps <- Sync[F].delay(map.contains(alarm))
             _ <- m.update { map =>
               if (containsAlarmTimestamps)
                 map.updated(alarm, map(alarm) :+ currentTime)
@@ -64,7 +68,7 @@ object AlarmThrottling {
             }
           } yield ()
 
-        override def clearThrottlingFor(alarm: Alarm): IO[Nothing, Unit] =
+        override def clearThrottlingFor(alarm: Alarm): F[Unit] =
           for {
             _ <- m.update(_.updated(alarm, Vector()))
           } yield ()

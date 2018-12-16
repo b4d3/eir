@@ -13,7 +13,6 @@ object Main extends App {
 
   val logger = Logger("Eir Main")
 
-
   logger.info("Starting EIR node")
 
   val checkImeiRequestQueue = new LinkedBlockingQueue[(String, CheckImeiMessage)]
@@ -27,5 +26,5 @@ object Main extends App {
     override lazy val faultManager = new FaultManager(new LoggingNotifier)
   }
 
-  trafficHandler.startHandlingTraffic()
+  trafficHandler.handleIncomingMessages()
 }

@@ -1,8 +1,8 @@
 package config
 
 case class FeEndpoint(protocol: String,
-                       address: String,
-                       port: Int)
+                      address: String,
+                      port: Int)
 
 case class Ldap(host: String,
                 port: Int,

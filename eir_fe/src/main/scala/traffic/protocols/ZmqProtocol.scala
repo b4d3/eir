@@ -3,45 +3,62 @@ package traffic.protocols
 import java.math.BigInteger
 
 import com.typesafe.scalalogging.Logger
-import config.{EirFeConfig, FmConfig}
+import config.EirFeConfig
+import org.zeromq.ZMQ.Socket
 import org.zeromq.{ZContext, ZFrame, ZMQ, ZMsg}
 import pureconfig.generic.ProductHint
 import pureconfig.{CamelCase, ConfigFieldMapping}
 import responseColors.ResponseColor
 import pureconfig.generic.auto._
+import scalaz.Monad
+import scalaz.Scalaz._
+import utils.logging.Logging
 
-trait ZmqProtocol extends Protocol {
+object ZmqProtocol {
 
-  private val logger = Logger(classOf[ZmqProtocol])
-  private implicit def hint[T] = ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
-  private val config = pureconfig.loadConfigOrThrow[EirFeConfig]
+  def apply[F[_] : Monad : Logging]: F[ZmqProtocol[F]] = {
 
-  private val context: ZContext = new ZContext(1)
+    implicit val logger = Logger(classOf[ZmqProtocol[F]])
 
-  private val frontendSocket: ZMQ.Socket = context.createSocket(ZMQ.ROUTER)
+    implicit def hint[T] = ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
 
-  {
+    val config = pureconfig.loadConfigOrThrow[EirFeConfig]
+
     val protocol = config.feEndpoint.protocol
     val address = config.feEndpoint.address
     val port = config.feEndpoint.port
-    frontendSocket.bind(s"$protocol$address:$port")
+
+    for {
+      context <- Monad[F].pure(new ZContext(1))
+      frontendSocket = context.createSocket(ZMQ.ROUTER)
+      requestQueueSocket = context.createSocket(ZMQ.PUSH)
+      responseQueueSocket = context.createSocket(ZMQ.PULL)
+      inprocRequestQueueSocket = context.createSocket(ZMQ.PULL)
+      inprocResponseQueueSocket = context.createSocket(ZMQ.PUSH)
+
+      _ <- Monad[F].pure(frontendSocket.bind(s"$protocol$address:$port"))
+      _ <- Monad[F].pure(requestQueueSocket.bind("inproc://requestQueueSocket"))
+      _ <- Monad[F].pure(responseQueueSocket.bind("inproc://responseQueueSocket"))
+      _ <- Monad[F].pure(inprocRequestQueueSocket.connect("inproc://requestQueueSocket"))
+      _ <- Monad[F].pure(inprocResponseQueueSocket.connect("inproc://responseQueueSocket"))
+
+    } yield new ZmqProtocol[F](frontendSocket, requestQueueSocket, responseQueueSocket,
+      inprocRequestQueueSocket, inprocResponseQueueSocket)
   }
+}
 
-  private val requestQueueSocket: ZMQ.Socket = context.createSocket(ZMQ.PUSH)
-  requestQueueSocket.bind("inproc://requestQueueSocket")
+class ZmqProtocol[F[_] : Monad : Logging] private(frontendSocket: Socket,
+                                                  requestQueueSocket: Socket,
+                                                  responseQueueSocket: Socket,
+                                                  inprocRequestQueueSocket: Socket,
+                                                  inprocResponseQueueSocket: Socket)
+  extends Protocol[F] {
 
-  private val responseQueueSocket: ZMQ.Socket = context.createSocket(ZMQ.PULL)
-  responseQueueSocket.bind("inproc://responseQueueSocket")
-
-  private val inprocRequestQueueSocket: ZMQ.Socket = context.createSocket(ZMQ.PULL)
-  inprocRequestQueueSocket.connect("inproc://requestQueueSocket")
-
-  private val inprocResponseQueueSocket: ZMQ.Socket = context.createSocket(ZMQ.PUSH)
-  inprocResponseQueueSocket.connect("inproc://responseQueueSocket")
+  implicit private val logger = Logger(classOf[ZmqProtocol[F]])
 
   new Thread(() => {
 
-    logger.info("Started receiving messages")
+    Logging[F].info("Started receiving messages")
 
     while (true) {
 
@@ -56,7 +73,7 @@ trait ZmqProtocol extends Protocol {
       assert(reqPayload != null)
       msg.destroy()
 
-      logger.debug(s"RECEIVED: $reqPayload FROM: $reqAddress")
+      Logging[F].debug(s"RECEIVED: $reqPayload FROM: $reqAddress")
 
       requestQueueSocket.send(s"$reqAddress;$reqPayload")
 
@@ -93,20 +110,18 @@ trait ZmqProtocol extends Protocol {
 
     val respAddress = respMessageSplit(0)
     val respPayload = respMessageSplit(1)
+
     (respAddress, respPayload)
   }
 
-  override def receiveMessage(): (String, String) = {
+  override def receiveMessage(): F[(String, String)] =
+    for {
+      message <- Monad[F].pure(new String(inprocRequestQueueSocket.recv(0)))
+      (address, payload) = extractAddressAndPayload(message)
+    } yield (address, payload)
 
-    val message = new String(inprocRequestQueueSocket.recv(0))
-
-    val (address: String, payload: String) = extractAddressAndPayload(message)
-
-    (address, payload)
-  }
-
-  override def sendMessage(address: String, responseColor: ResponseColor): Unit = {
-
-    inprocResponseQueueSocket.send(s"$address;${responseColor.toString}")
-  }
+  override def sendMessage(address: String, responseColor: ResponseColor): F[Unit] =
+    for {
+      _ <- Monad[F].pure(inprocResponseQueueSocket.send(s"$address;${responseColor.toString}"))
+    } yield ()
 }

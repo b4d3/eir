@@ -1,11 +1,11 @@
 package faultManagement
 
+import cats.effect.Sync
+import cats.implicits._
 import com.typesafe.scalalogging.Logger
-import scalaz.Monad
-import scalaz.Scalaz._
 import utils.logging.Logging
 
-final class FaultManager[F[_] : Monad : Logging : AlarmThrottling](notifier: Notifier[F]) {
+final class FaultManager[F[_] : Sync : Logging : AlarmThrottling](notifier: Notifier[F]) {
 
   implicit val logger: Logger = Logger(classOf[FaultManager[F]])
 

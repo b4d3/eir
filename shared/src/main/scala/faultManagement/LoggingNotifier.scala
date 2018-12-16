@@ -1,10 +1,9 @@
 package faultManagement
 
 import com.typesafe.scalalogging.Logger
-import scalaz.Applicative
 import utils.logging.Logging
 
-final class LoggingNotifier[F[_] : Applicative : Logging] extends Notifier[F] {
+final class LoggingNotifier[F[_] : Logging] extends Notifier[F] {
 
   private implicit val logger: Logger = Logger(classOf[LoggingNotifier[F]])
 

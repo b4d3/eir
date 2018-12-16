@@ -1,14 +1,13 @@
+import cats.effect.{ExitCode, IO, IOApp, Sync}
 import com.typesafe.scalalogging.Logger
 import eu.timepit.refined.auto._
 import messages.CheckImei
-import scalaz.Monad
-import scalaz.Scalaz._
-import scalaz.zio.IO
 import traffic.protocols.ZmqProtocol
 import utils.logging.Logging
 import utils.logging.interpreters.IOLogger
+import cats.implicits._
 
-object Main extends scalaz.zio.App {
+object Main extends IOApp {
 
   private implicit val logger: Logger = Logger("Traffgen Main")
 
@@ -16,25 +15,19 @@ object Main extends scalaz.zio.App {
   private val unknownImei = CheckImei("1234567890123400")
   private val blacklistedImei = CheckImei("1234567890123456")
 
-  def program[F[_] : Monad : Logging]: F[Unit] =
+  def program[F[_] : Sync : Logging]: F[Unit] =
     for {
       zmqProtocol <- ZmqProtocol[F]()
-      traffgen <- Monad[F].pure(new TrafficGenerator[F](zmqProtocol))
+      traffgen <- Sync[F].delay(new TrafficGenerator[F](zmqProtocol))
       _ <- traffgen.sendCheckImeiMessage(imei) >>= (s => Logging[F].debug(s))
       _ <- traffgen.sendCheckImeiMessage(unknownImei) >>= (s => Logging[F].debug(s))
       _ <- traffgen.sendCheckImeiMessage(blacklistedImei) >>= (s => Logging[F].debug(s))
     } yield ()
 
-  def run(args: List[String]): IO[Nothing, ExitStatus] = {
+  def run(args: List[String]): IO[ExitCode] = {
 
-    implicit val logging = IOLogger.ioLogger
-    implicit val monad = new Monad[IO[Nothing, ?]] {
-      override def point[A](a: => A): IO[Nothing, A] = IO.sync(a)
+    implicit val logging: Logging[IO] = IOLogger.ioLogger
 
-      override def bind[A, B](fa: IO[Nothing, A])(f: A => IO[Nothing, B]): IO[Nothing, B] =
-        fa.flatMap(f)
-    }
-
-    program[IO[Nothing, ?]].attempt.map(_.fold(_ => 1, _ => 0)).map(ExitStatus.ExitNow(_))
+    program[IO].attempt.map(_.fold(_ => 1, _ => 0)).map(ExitCode(_))
   }
 }
