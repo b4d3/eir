@@ -40,7 +40,7 @@ object AlarmThrottling {
           for {
             currentTime <- clock.monotonic(MILLISECONDS)
             _ <- m.update {
-              _.mapValues(_.filter(i => (currentTime - i) >= throttlingPeriod))
+              _.mapValues(_.filter(i => (currentTime - i) <= throttlingPeriod))
             }
           } yield ()
 
@@ -49,7 +49,7 @@ object AlarmThrottling {
             _ <- removeAlarmsOlderThanThrottlingPeriod()
             map <- m.get
             throttled <- map.get(alarm) match {
-              case Some(alarmTimestamps) => Sync[F].delay(alarmTimestamps.size < maxActiveAlarms)
+              case Some(alarmTimestamps) => Sync[F].delay(alarmTimestamps.size >= maxActiveAlarms)
 
               case None => Sync[F].pure(false)
             }
