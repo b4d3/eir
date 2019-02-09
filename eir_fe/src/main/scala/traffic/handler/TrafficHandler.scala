@@ -64,6 +64,5 @@ final class TrafficHandler[F[_] : Sync : Logging] private(protocol: Protocol[F],
     for {
       (address, color) <- Sync[F].delay(checkImeiResponseQueue.take())
       _ <- protocol.sendMessage(address, color)
-      _ <- Logging[F].info("SENT: " + color)
     } yield ()
 }

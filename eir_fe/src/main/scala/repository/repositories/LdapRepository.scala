@@ -1,6 +1,5 @@
 package repository.repositories
 
-import cats.effect.concurrent.Ref
 import cats.effect.{Sync, Timer}
 import cats.implicits._
 import com.typesafe.scalalogging.Logger
@@ -37,7 +36,20 @@ object LdapRepository {
     val host = config.ldap.host
     val port = config.ldap.port
 
-    Ref.of[F, LDAPConnection](new LDAPConnection(host, port)).map { c =>
+
+    def notifyError(e: Throwable): F[Unit] = {
+      Logging[F].error("Error when connecting to LDAP repository: " + e.getMessage) >>
+        faultManager.raiseAlarm(RepositoryAlarms.REPOSITORY_UNREACHABLE) >>
+        Logging[F].info(s"Retry to connect in a $retryPeriod ms") >>
+        timer.sleep(retryPeriod.milliseconds)
+    }
+
+    def retryConstruction(): F[LDAPConnection] =
+      Sync[F].delay(new LDAPConnection(host, port)).handleErrorWith { e =>
+        notifyError(e) >> retryConstruction()
+      }
+
+    retryConstruction().map { c =>
       new EirRepository[F] {
 
         override def getResponseColor(checkImeiMessage: CheckImeiMessage): F[String] = {
@@ -53,19 +65,15 @@ object LdapRepository {
           def retryConnection(connection: LDAPConnection): F[Unit] = {
 
             Sync[F].delay(connection.connect(host, port)).handleErrorWith { e =>
-              Logging[F].error("Error when connecting to LDAP repository: " + e.getMessage) >>
-                faultManager.raiseAlarm(RepositoryAlarms.REPOSITORY_UNREACHABLE) >>
-                Logging[F].info(s"Retry to connect in a $retryPeriod ms") >>
-                timer.sleep(retryPeriod.milliseconds) >>
-                retryConnection(connection)
+              notifyError(e) >> retryConnection(connection)
             }
           }
 
           for {
-            conP <- c.get.fproduct(con => con.isConnected)
-            connection <- if (conP._2)
-              Logging[F].info(s"LDAP Connection to $host:$port established").as(conP._1)
-            else retryConnection(conP._1).as(conP._1)
+            isConnected <- Sync[F].delay(c.isConnected)
+            connection <- if (isConnected)
+              Logging[F].info(s"LDAP Connection to $host:$port established").as(c)
+            else retryConnection(c).as(c)
 
           } yield connection
 

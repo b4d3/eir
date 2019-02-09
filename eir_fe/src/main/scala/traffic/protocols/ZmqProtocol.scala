@@ -94,5 +94,6 @@ final class ZmqProtocol[F[_] : Sync : Logging] private(frontendSocket: Socket,
     } yield (address, payload)
 
   override def sendMessage(address: String, responseColor: ResponseColor): F[Unit] =
-    sendToClient(address, responseColor.toString)
+    sendToClient(address, responseColor.toString) >>
+      Logging[F].info(s"SENT: ${responseColor.toString} to $address")
 }
