@@ -1,10 +1,8 @@
 package repository
 
-import faultManagement.FaultManagerImpl
 import messages.CheckImeiMessage
 
-trait EirRepository {
+trait EirRepository[F[_]] {
 
-  def getResponseColor(checkImeiMessage: CheckImeiMessage): String
-  val faultManager: FaultManagerImpl
+  def getResponseColor(checkImeiMessage: CheckImeiMessage): F[String]
 }

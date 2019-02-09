@@ -34,7 +34,7 @@ class ZmqProtocol[F[_] : Sync : Logging] private(socket: ZMQ.Socket) extends Pro
 
   private implicit val className: Logger = Logger(classOf[ZmqProtocol[F]])
 
-  override def send(message: String): F[String] =
+  override def sendAndReceiveResp(message: String): F[String] =
     for {
       _ <- Logging[F].debug(s"Sending request $message")
       _ <- Sync[F].delay(socket.send(message.getBytes(), 0))

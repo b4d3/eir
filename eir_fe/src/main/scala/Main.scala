@@ -1,30 +1,59 @@
 import java.util.concurrent.LinkedBlockingQueue
 
+import cats.effect._
+import cats.implicits._
 import com.typesafe.scalalogging.Logger
-import faultManagement.{FaultManager, LoggingNotifier}
+import faultManagement.{AlarmThrottling, FaultManager, LoggingNotifier}
 import messages.CheckImeiMessage
 import repository.EirRepositoryHandler
 import repository.repositories.LdapRepository
 import responseColors.ResponseColor
 import traffic.handler.TrafficHandler
 import traffic.protocols.ZmqProtocol
+import utils.logging.Logging
+import utils.logging.interpreters.IOLogger
 
-object Main extends App {
+import scala.concurrent.ExecutionContext.Implicits.global
 
-  val logger = Logger("Eir Main")
+object Main extends IOApp {
 
-  logger.info("Starting EIR node")
+  // Needed for `start`
+  implicit val ctx = IO.contextShift(global)
 
-  val checkImeiRequestQueue = new LinkedBlockingQueue[(String, CheckImeiMessage)]
-  val checkImeiResponseQueue = new LinkedBlockingQueue[(String, ResponseColor)]
+  private implicit val logger = Logger("Eir Main")
 
-  val trafficHandler = new TrafficHandler(checkImeiRequestQueue, checkImeiResponseQueue) with
-    ZmqProtocol
+  def programDeps[F[_] : Sync : Logging : AlarmThrottling : Timer]: F[(TrafficHandler[F], EirRepositoryHandler[F])] =
+    for {
+      _ <- Logging[F].info("Starting EIR node")
+      checkImeiRequestQueue = new LinkedBlockingQueue[(String, CheckImeiMessage)]
+      checkImeiResponseQueue = new LinkedBlockingQueue[(String, ResponseColor)]
+      zmqProtocol <- ZmqProtocol[F]
+      trafficHandler <- TrafficHandler(zmqProtocol, checkImeiRequestQueue, checkImeiResponseQueue)
+      notifier <- Sync[F].delay(new LoggingNotifier[F])
+      faultManager <- Sync[F].delay(new FaultManager[F](notifier))
+      ldapRepository <- LdapRepository[F](faultManager)
+      repositoryHandler <- EirRepositoryHandler(ldapRepository, checkImeiRequestQueue, checkImeiResponseQueue)
 
-  val repositoryHandler = new EirRepositoryHandler(checkImeiRequestQueue, checkImeiResponseQueue)
-    with LdapRepository {
-    override lazy val faultManager = new FaultManager(new LoggingNotifier)
+    } yield (trafficHandler, repositoryHandler)
+
+  def run(args: List[String]): IO[ExitCode] = {
+
+    implicit val logging: Logging[IO] = IOLogger.ioLogger
+
+    (for {
+      tr <- AlarmThrottling.create[IO]().flatMap { at =>
+        implicit val alarmThrottling = at
+        programDeps[IO]
+      }
+      trafficHandler = tr._1
+      repositoryHandler = tr._2
+
+      f1 <- trafficHandler.handleIncomingMessage().foreverM.start
+      f2 <- trafficHandler.handleOutgoingMessage().foreverM.start
+      f3 <- repositoryHandler.handleEirRepositoryMessage().foreverM.start
+      _ <- f1.join
+      _ <- f2.join
+      _ <- f3.join
+    } yield ()).attempt.map(_.fold(_ => 1, _ => 0)).map(ExitCode(_))
   }
-
-  trafficHandler.handleIncomingMessages()
 }

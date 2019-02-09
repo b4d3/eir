@@ -1,47 +1,38 @@
 package repository
 
-import java.util.concurrent.{Executors, LinkedBlockingQueue}
+import java.util.concurrent.LinkedBlockingQueue
 
+import cats.implicits._
+import cats.effect.Sync
 import com.typesafe.scalalogging.Logger
 import messages.CheckImeiMessage
 import responseColors._
 
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import scala.util.{Failure, Success}
+object EirRepositoryHandler {
 
-abstract class EirRepositoryHandler(val checkImeiRequestQueue: LinkedBlockingQueue[(String, CheckImeiMessage)],
-                                    val checkImeiResponseQueue: LinkedBlockingQueue[(String, ResponseColor)])
-  extends EirRepository {
+  def apply[F[_] : Sync](eirRepository: EirRepository[F],
+                         checkImeiRequestQueue: LinkedBlockingQueue[(String, CheckImeiMessage)],
+                         checkImeiResponseQueue: LinkedBlockingQueue[(String, ResponseColor)])
+  : F[EirRepositoryHandler[F]] =
+    Sync[F].delay(new EirRepositoryHandler[F](eirRepository, checkImeiRequestQueue, checkImeiResponseQueue))
+}
 
-  private val logger = Logger(classOf[EirRepositoryHandler])
+final class EirRepositoryHandler[F[_] : Sync] private(eirRepository: EirRepository[F],
+                                                      val checkImeiRequestQueue: LinkedBlockingQueue[(String, CheckImeiMessage)],
+                                                      val checkImeiResponseQueue: LinkedBlockingQueue[(String, ResponseColor)]) {
 
-  private implicit val ec: ExecutionContextExecutor = ExecutionContext.fromExecutor(
-    Executors.newCachedThreadPool())
+  private implicit val logger = Logger(classOf[EirRepositoryHandler[F]])
 
-  new Thread(() => {
+  def handleEirRepositoryMessage(): F[Unit] = for {
 
-    while (true) {
-
-      val (address, checkImeiMessage) = checkImeiRequestQueue.take()
-
-      Future {
-
-        val sendAddress = address
-        val responseColorString = getResponseColor(checkImeiMessage)
-
-        val responseColor = responseColorString match {
-          case "WHITE" => White()
-          case "BLACK" => Black()
-        }
-
-        (sendAddress, responseColor)
-
-      } onComplete {
-
-        case Success(response) => checkImeiResponseQueue.put(response)
-        case Failure(t) => logger.error("Problem in querying repository:\n" + t)
-      }
+    addressAndCheckImeiMsg <- Sync[F].delay(checkImeiRequestQueue.take())
+    (address, checkImeiMessage) = addressAndCheckImeiMsg
+    responseColorString <- eirRepository.getResponseColor(checkImeiMessage)
+    responseColor = responseColorString match {
+      case "WHITE" => White()
+      case "BLACK" => Black()
     }
-  }).start()
+    _ <- Sync[F].delay(checkImeiResponseQueue.put((address, responseColor)))
+  } yield ()
 
 }

@@ -2,23 +2,21 @@ package traffic.protocols
 
 import java.math.BigInteger
 
+import cats.effect.Sync
+import cats.implicits._
 import com.typesafe.scalalogging.Logger
 import config.EirFeConfig
 import org.zeromq.ZMQ.Socket
 import org.zeromq.{ZContext, ZFrame, ZMQ, ZMsg}
 import pureconfig.generic.ProductHint
+import pureconfig.generic.auto._
 import pureconfig.{CamelCase, ConfigFieldMapping}
 import responseColors.ResponseColor
-import pureconfig.generic.auto._
-import scalaz.Monad
-import scalaz.Scalaz._
 import utils.logging.Logging
 
 object ZmqProtocol {
 
-  def apply[F[_] : Monad : Logging]: F[ZmqProtocol[F]] = {
-
-    implicit val logger = Logger(classOf[ZmqProtocol[F]])
+  def apply[F[_] : Sync : Logging]: F[ZmqProtocol[F]] = {
 
     implicit def hint[T] = ProductHint[T](ConfigFieldMapping(CamelCase, CamelCase))
 
@@ -29,99 +27,72 @@ object ZmqProtocol {
     val port = config.feEndpoint.port
 
     for {
-      context <- Monad[F].pure(new ZContext(1))
+      context <- Sync[F].delay(new ZContext(1))
       frontendSocket = context.createSocket(ZMQ.ROUTER)
       requestQueueSocket = context.createSocket(ZMQ.PUSH)
       responseQueueSocket = context.createSocket(ZMQ.PULL)
       inprocRequestQueueSocket = context.createSocket(ZMQ.PULL)
       inprocResponseQueueSocket = context.createSocket(ZMQ.PUSH)
 
-      _ <- Monad[F].pure(frontendSocket.bind(s"$protocol$address:$port"))
-      _ <- Monad[F].pure(requestQueueSocket.bind("inproc://requestQueueSocket"))
-      _ <- Monad[F].pure(responseQueueSocket.bind("inproc://responseQueueSocket"))
-      _ <- Monad[F].pure(inprocRequestQueueSocket.connect("inproc://requestQueueSocket"))
-      _ <- Monad[F].pure(inprocResponseQueueSocket.connect("inproc://responseQueueSocket"))
+      _ <- Sync[F].delay(frontendSocket.bind(s"$protocol$address:$port"))
+      _ <- Sync[F].delay(requestQueueSocket.bind("inproc://requestQueueSocket"))
+      _ <- Sync[F].delay(responseQueueSocket.bind("inproc://responseQueueSocket"))
+      _ <- Sync[F].delay(inprocRequestQueueSocket.connect("inproc://requestQueueSocket"))
+      _ <- Sync[F].delay(inprocResponseQueueSocket.connect("inproc://responseQueueSocket"))
 
     } yield new ZmqProtocol[F](frontendSocket, requestQueueSocket, responseQueueSocket,
       inprocRequestQueueSocket, inprocResponseQueueSocket)
   }
 }
 
-class ZmqProtocol[F[_] : Monad : Logging] private(frontendSocket: Socket,
-                                                  requestQueueSocket: Socket,
-                                                  responseQueueSocket: Socket,
-                                                  inprocRequestQueueSocket: Socket,
-                                                  inprocResponseQueueSocket: Socket)
+final class ZmqProtocol[F[_] : Sync : Logging] private(frontendSocket: Socket,
+                                                       requestQueueSocket: Socket,
+                                                       responseQueueSocket: Socket,
+                                                       inprocRequestQueueSocket: Socket,
+                                                       inprocResponseQueueSocket: Socket)
   extends Protocol[F] {
 
-  implicit private val logger = Logger(classOf[ZmqProtocol[F]])
+  implicit private val logger: Logger = Logger(classOf[ZmqProtocol[F]])
 
-  new Thread(() => {
+  private def sendToClient(respAddress: String, respPayload: String): F[Unit] = for {
 
-    Logging[F].info("Started receiving messages")
+    addressByteArray <- Sync[F].delay(new BigInteger(respAddress, 16)).map(_.toByteArray)
+    respAddressFrame <- Sync[F].delay(new ZFrame(addressByteArray))
+    respEmptyFrame <- Sync[F].delay(new ZFrame(""))
+    respPayloadFrame <- Sync[F].delay(new ZFrame(respPayload))
 
-    while (true) {
-
-      val msg = ZMsg.recvMsg(frontendSocket)
-
-      // Message from client's REQ socket contains 3 frames:
-      // address + empty frame + request content (payload)
-      val reqAddress = msg.pop
-      val emptyFrame = msg.pop
-      val reqPayload = msg.pop
-
-      assert(reqPayload != null)
-      msg.destroy()
-
-      Logging[F].debug(s"RECEIVED: $reqPayload FROM: $reqAddress")
-
-      requestQueueSocket.send(s"$reqAddress;$reqPayload")
-
-      val responseMessage = new String(responseQueueSocket.recv(0))
-
-      val (respAddress: String, respPayload: String) = extractAddressAndPayload(responseMessage)
-
-      sendToClient(respAddress, respPayload)
-
-    }
-  }).start()
-
-
-  private def sendToClient(respAddress: String, respPayload: String): Unit = {
-
-    val addressByteArray = new BigInteger(respAddress, 16).toByteArray
-    val respAddressFrame = new ZFrame(addressByteArray)
-    val respEmptyFrame = new ZFrame("")
-    val respPayloadFrame = new ZFrame(respPayload)
-
-    respAddressFrame.send(frontendSocket, ZFrame.REUSE + ZFrame.MORE)
+    _ <- Sync[F].delay(respAddressFrame.send(frontendSocket, ZFrame.REUSE + ZFrame.MORE))
     // Sending empty frame because client expects such constructed message
-    respEmptyFrame.send(frontendSocket, ZFrame.REUSE + ZFrame.MORE)
-    respPayloadFrame.send(frontendSocket, ZFrame.REUSE)
+    _ <- Sync[F].delay(respEmptyFrame.send(frontendSocket, ZFrame.REUSE + ZFrame.MORE))
+    _ <- Sync[F].delay(respPayloadFrame.send(frontendSocket, ZFrame.REUSE))
 
-    respAddressFrame.destroy()
-    respEmptyFrame.destroy()
-    respPayloadFrame.destroy()
-  }
+    _ <- Sync[F].delay(respAddressFrame.destroy())
+    _ <- Sync[F].delay(respEmptyFrame.destroy())
+    _ <- Sync[F].delay(respPayloadFrame.destroy())
 
-  private def extractAddressAndPayload(responseMessage: String): (String, String) = {
+  } yield ()
 
-    val respMessageSplit = responseMessage.split(";")
+  private def extractAddressAndPayloadFromZFrame(msg: ZMsg): (String, String) = {
+    // Message from client's REQ socket contains 3 frames:
+    // address + empty frame + request content (payload)
+    val reqAddress = msg.pop
+    val emptyFrame = msg.pop
+    val reqPayload = msg.pop
 
-    val respAddress = respMessageSplit(0)
-    val respPayload = respMessageSplit(1)
+    // TODO In future, don't throw exception. Smarter error handling?
+    assert(reqPayload != null)
+    msg.destroy()
 
-    (respAddress, respPayload)
+    (reqAddress.toString, reqPayload.toString)
   }
 
   override def receiveMessage(): F[(String, String)] =
     for {
-      message <- Monad[F].pure(new String(inprocRequestQueueSocket.recv(0)))
-      (address, payload) = extractAddressAndPayload(message)
+      msg <- Sync[F].delay(ZMsg.recvMsg(frontendSocket))
+      (address, payload) = extractAddressAndPayloadFromZFrame(msg)
+      _ <- Logging[F].debug(s"RECEIVED: $payload FROM: $address")
     } yield (address, payload)
 
   override def sendMessage(address: String, responseColor: ResponseColor): F[Unit] =
-    for {
-      _ <- Monad[F].pure(inprocResponseQueueSocket.send(s"$address;${responseColor.toString}"))
-    } yield ()
+    sendToClient(address, responseColor.toString)
 }

@@ -19,9 +19,9 @@ object Main extends IOApp {
     for {
       zmqProtocol <- ZmqProtocol[F]()
       traffgen <- Sync[F].delay(new TrafficGenerator[F](zmqProtocol))
-      _ <- traffgen.sendCheckImeiMessage(imei) >>= (s => Logging[F].debug(s))
-      _ <- traffgen.sendCheckImeiMessage(unknownImei) >>= (s => Logging[F].debug(s))
-      _ <- traffgen.sendCheckImeiMessage(blacklistedImei) >>= (s => Logging[F].debug(s))
+      _ <- traffgen.sendCheckImeiMessage(imei) >>= (Logging[F].debug(_))
+      _ <- traffgen.sendCheckImeiMessage(unknownImei) >>= (Logging[F].debug(_))
+      _ <- traffgen.sendCheckImeiMessage(blacklistedImei) >>= (Logging[F].debug(_))
     } yield ()
 
   def run(args: List[String]): IO[ExitCode] = {

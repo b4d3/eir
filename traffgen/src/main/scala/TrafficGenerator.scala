@@ -10,6 +10,6 @@ final class TrafficGenerator[F[_]](protocol: Protocol[F]) {
       case CheckImeiWithImsi(imei, imsi) => s"${imei.value};${imsi.value}"
     }
 
-    protocol.send(message)
+    protocol.sendAndReceiveResp(message)
   }
 }
