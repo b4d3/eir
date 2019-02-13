@@ -42,18 +42,19 @@ object Main extends IOApp {
 
     (for {
       tr <- AlarmThrottling.create[IO]().flatMap { at =>
-        implicit val alarmThrottling = at
+        implicit val alarmThrottling: AlarmThrottling[IO] = at
         programDeps[IO]
       }
       trafficHandler = tr._1
       repositoryHandler = tr._2
 
-      f1 <- trafficHandler.handleIncomingMessage().foreverM.start
-      f2 <- trafficHandler.handleOutgoingMessage().foreverM.start
-      f3 <- repositoryHandler.handleEirRepositoryMessage().foreverM.start
-      _ <- f1.join
-      _ <- f2.join
-      _ <- f3.join
+      inTraffWorker = trafficHandler.handleIncomingMessage().foreverM
+      outTraffWorker = trafficHandler.handleOutgoingMessage().foreverM
+      eirRepoWorker = repositoryHandler.handleEirRepositoryMessage().foreverM
+      _ <- List.fill(1000)(inTraffWorker).traverse(_.start)
+      _ <- List.fill(1000)(outTraffWorker).traverse(_.start)
+      _ <- List.fill(1000)(eirRepoWorker).traverse(_.start)
+      _ <- IO.never
     } yield ()).attempt.map(_.fold(_ => 1, _ => 0)).map(ExitCode(_))
   }
 }

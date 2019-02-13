@@ -49,72 +49,74 @@ object LdapRepository {
         notifyError(e) >> retryConstruction()
       }
 
-    retryConstruction().map { c =>
-      new EirRepository[F] {
+    retryConstruction()
+      .flatMap(Logging[F].info(s"LDAP Connection to $host:$port established").as(_))
+      .map { c =>
+        new EirRepository[F] {
 
-        override def getResponseColor(checkImeiMessage: CheckImeiMessage): F[String] = {
+          override def getResponseColor(checkImeiMessage: CheckImeiMessage): F[String] = {
 
-          for {
-            connection <- acquireConnection(host, port)
-            responseColors <- doSearch(connection, checkImeiMessage)
-          } yield responseColors
-        }
-
-        private def acquireConnection(host: String, port: Int): F[LDAPConnection] = {
-
-          def retryConnection(connection: LDAPConnection): F[Unit] = {
-
-            Sync[F].delay(connection.connect(host, port)).handleErrorWith { e =>
-              notifyError(e) >> retryConnection(connection)
-            }
+            for {
+              connection <- acquireConnection(host, port)
+              responseColors <- doSearch(connection, checkImeiMessage)
+            } yield responseColors
           }
 
-          for {
-            isConnected <- Sync[F].delay(c.isConnected)
-            connection <- if (isConnected)
-              Logging[F].info(s"LDAP Connection to $host:$port established").as(c)
-            else retryConnection(c).as(c)
+          private def acquireConnection(host: String, port: Int): F[LDAPConnection] = {
 
-          } yield connection
+            def retryConnection(connection: LDAPConnection): F[Unit] = {
 
-        }
-
-        private def doSearch(connection: LDAPConnection, checkImeiMessage: CheckImeiMessage): F[String] = {
-
-          val searchFilter = createImeiSearchFilter(checkImeiMessage)
-
-          for {
-            maybeSearchResult <- Sync[F].delay(connection.search(baseDn, SearchScope.ONE, searchFilter)).attempt
-
-            searchResult <- maybeSearchResult match {
-              case Right(sr) => sr.getSearchEntries.asScala match {
-                // TODO implement proper logic.
-                // TODO Where to keep the color information? As value in LDAP database for each IMEI or
-                //  have specific LDAP branch?
-                case entries if entries.isEmpty => "BLACK".pure[F]
-                case entries if entries.head.getAttributeValue(IMSI_KEY).startsWith("098") => "BLACK".pure[F]
-                case _ => "WHITE".pure[F]
+              Sync[F].delay(connection.connect(host, port)).handleErrorWith { e =>
+                notifyError(e) >> retryConnection(connection)
               }
-
-              case Left(e) => for {
-                _ <- Logging[F].error(s"Error when executing LDAP search on " +
-                  s"$checkImeiMessage: " + e.getMessage)
-                _ <- faultManager.raiseAlarm(RepositoryAlarms.REPOSITORY_UNREACHABLE)
-              } yield "WHITE"
             }
-          } yield searchResult
-        }
 
-        private def createImeiSearchFilter(checkImeiMessage: CheckImeiMessage): Filter = {
+            for {
+              isConnected <- Sync[F].delay(c.isConnected)
+              connection <- if (isConnected)
+                Logging[F].info(s"LDAP Connection to $host:$port established").as(c)
+              else retryConnection(c).as(c)
 
-          checkImeiMessage match {
-            case CheckImeiWithImsi(imei, imsi) => Filter.createANDFilter(Filter
-              .createEqualityFilter(IMEI_KEY, imei.value), Filter.createEqualityFilter(IMSI_KEY, imsi.value))
+            } yield connection
 
-            case CheckImei(imei) => Filter.createEqualityFilter(IMEI_KEY, imei.value)
+          }
+
+          private def doSearch(connection: LDAPConnection, checkImeiMessage: CheckImeiMessage): F[String] = {
+
+            val searchFilter = createImeiSearchFilter(checkImeiMessage)
+
+            for {
+              maybeSearchResult <- Sync[F].delay(connection.search(baseDn, SearchScope.ONE, searchFilter)).attempt
+
+              searchResult <- maybeSearchResult match {
+                case Right(sr) => sr.getSearchEntries.asScala match {
+                  // TODO implement proper logic.
+                  // TODO Where to keep the color information? As value in LDAP database for each IMEI or
+                  //  have specific LDAP branch?
+                  case entries if entries.isEmpty => "BLACK".pure[F]
+                  case entries if entries.head.getAttributeValue(IMSI_KEY).startsWith("098") => "BLACK".pure[F]
+                  case _ => "WHITE".pure[F]
+                }
+
+                case Left(e) => for {
+                  _ <- Logging[F].error(s"Error when executing LDAP search on " +
+                    s"$checkImeiMessage: " + e.getMessage)
+                  _ <- faultManager.raiseAlarm(RepositoryAlarms.REPOSITORY_UNREACHABLE)
+                } yield "WHITE"
+              }
+            } yield searchResult
+          }
+
+          private def createImeiSearchFilter(checkImeiMessage: CheckImeiMessage): Filter = {
+
+            checkImeiMessage match {
+              case CheckImeiWithImsi(imei, imsi) => Filter.createANDFilter(Filter
+                .createEqualityFilter(IMEI_KEY, imei.value), Filter.createEqualityFilter(IMSI_KEY, imsi.value))
+
+              case CheckImei(imei) => Filter.createEqualityFilter(IMEI_KEY, imei.value)
+            }
           }
         }
       }
-    }
   }
 }
