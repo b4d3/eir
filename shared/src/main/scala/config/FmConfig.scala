@@ -1,3 +1,3 @@
 package config
 
-sealed case class FmConfig(maxActiveAlarms: Int, throttlingPeriod: Int)
+final case class FmConfig(maxActiveAlarms: Int, throttlingPeriod: Int)
