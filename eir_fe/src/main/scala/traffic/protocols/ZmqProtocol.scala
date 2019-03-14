@@ -31,25 +31,18 @@ object ZmqProtocol {
       frontendSocket = context.createSocket(ZMQ.ROUTER)
       requestQueueSocket = context.createSocket(ZMQ.PUSH)
       responseQueueSocket = context.createSocket(ZMQ.PULL)
-      inprocRequestQueueSocket = context.createSocket(ZMQ.PULL)
-      inprocResponseQueueSocket = context.createSocket(ZMQ.PUSH)
 
       _ <- Sync[F].delay(frontendSocket.bind(s"$protocol$address:$port"))
       _ <- Sync[F].delay(requestQueueSocket.bind("inproc://requestQueueSocket"))
       _ <- Sync[F].delay(responseQueueSocket.bind("inproc://responseQueueSocket"))
-      _ <- Sync[F].delay(inprocRequestQueueSocket.connect("inproc://requestQueueSocket"))
-      _ <- Sync[F].delay(inprocResponseQueueSocket.connect("inproc://responseQueueSocket"))
 
-    } yield new ZmqProtocol[F](frontendSocket, requestQueueSocket, responseQueueSocket,
-      inprocRequestQueueSocket, inprocResponseQueueSocket)
+    } yield new ZmqProtocol[F](frontendSocket, requestQueueSocket, responseQueueSocket)
   }
 }
 
 final class ZmqProtocol[F[_] : Sync : Logging] private(frontendSocket: Socket,
                                                        requestQueueSocket: Socket,
-                                                       responseQueueSocket: Socket,
-                                                       inprocRequestQueueSocket: Socket,
-                                                       inprocResponseQueueSocket: Socket)
+                                                       responseQueueSocket: Socket)
   extends Protocol[F] {
 
   implicit private val logger: Logger = Logger(classOf[ZmqProtocol[F]])
